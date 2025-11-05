@@ -1,0 +1,701 @@
+================================================================================
+    SISTEMA DE GESTIÓN VETERINARIA - MANUAL DE USUARIO
+    PARTE 1: AUTENTICACIÓN Y GESTIÓN DE USUARIOS
+================================================================================
+
+FECHA: Noviembre 2025
+VERSIÓN: 1.0
+PROPÓSITO: Documentación técnica completa para desarrollo de manual de usuario
+
+
+================================================================================
+1. INTRODUCCIÓN AL SISTEMA
+================================================================================
+
+El Sistema de Gestión Veterinaria es una plataforma web integral que combina:
+- Gestión de usuarios con tres roles diferenciados
+- Reconocimiento facial biométrico para autenticación
+- Registro y administración de mascotas (caninos)
+- Reconocimiento biométrico facial de mascotas
+- Predicción de características mediante Inteligencia Artificial
+- Sistema de alertas para mascotas perdidas
+- Generación de carnets y códigos QR
+- Escáner de reconocimiento de mascotas
+- Sistema de notificaciones interno
+
+
+================================================================================
+2. REGISTRO DE USUARIOS
+================================================================================
+
+2.1 PROCESO DE REGISTRO
+------------------------
+URL: /register/
+Método: Acceso libre (sin necesidad de autenticación previa)
+
+CAMPOS OBLIGATORIOS:
+- Username (nombre de usuario único)
+- Email (correo electrónico único)
+- Contraseña (mínimo 8 caracteres)
+- Confirmación de contraseña
+- Nombre completo (first_name + last_name)
+- Cédula (DNI - documento único de identificación)
+
+CAMPOS OPCIONALES:
+- Foto de perfil
+- Dirección
+- Teléfono
+
+ROL ASIGNADO:
+Al registrarse, todos los usuarios reciben automáticamente el rol "OWNER" (Dueño de mascota)
+
+CARACTERÍSTICAS DEL FORMULARIO:
+✓ Validación en tiempo real del nombre de usuario
+✓ Validación de formato de email
+✓ Verificación de fortaleza de contraseña
+✓ Verificación de coincidencia de contraseñas
+✓ Icono de "ojo" para mostrar/ocultar contraseña
+✓ Mensajes de error descriptivos para cada campo
+✓ Prevención de doble envío del formulario (loading state)
+
+VALIDACIONES DEL SISTEMA:
+- Username: Debe ser único en el sistema
+- Email: Debe ser único y tener formato válido
+- Cédula: Debe ser única (10 dígitos)
+- Contraseña: Mínimo 8 caracteres, debe incluir letras y números
+
+RESULTADO EXITOSO:
+- Usuario creado con rol OWNER
+- Redirección automática al login
+- Mensaje de confirmación: "Cuenta creada exitosamente. Por favor inicia sesión."
+
+
+2.2 REGISTRO DE BIOMETRÍA FACIAL (POST-REGISTRO)
+------------------------------------------------
+URL: /facial-biometry/
+Disponible después del primer login
+
+PROPÓSITO:
+Permite al usuario registrar su rostro para autenticación biométrica (opcional)
+
+REQUISITOS:
+✓ Usuario debe estar autenticado
+✓ Cámara web funcional
+✓ Buena iluminación
+✓ Rostro visible de frente
+
+PROCESO PASO A PASO:
+
+1. ACCESO AL MÓDULO:
+   - Dashboard → Perfil → "Registrar Biometría Facial"
+   - O directamente desde el menú de perfil
+
+2. CAPTURA DE ROSTRO:
+   - El sistema activa la cámara web
+   - Se muestra vista previa en tiempo real
+   - Usuario debe posicionarse de frente
+   - Presionar botón "Capturar Rostro"
+
+3. VALIDACIONES AUTOMÁTICAS:
+   El sistema verifica:
+   ✓ Detección de rostro único (solo 1 persona en frame)
+   ✓ Calidad de imagen ≥ 70% de confianza
+   ✓ Iluminación adecuada
+   ✓ Nitidez suficiente
+   ✓ Rostro de frente (no de perfil)
+
+4. PROCESAMIENTO CON IA:
+   Tecnología: ArcFace ResNet100 (99.77% precisión)
+   - Detección de rostro con YuNet
+   - Identificación de 5 puntos clave (landmarks):
+     * Ojo izquierdo
+     * Ojo derecho
+     * Punta de la nariz
+     * Comisura izquierda de la boca
+     * Comisura derecha de la boca
+   - Alineación facial automática
+   - Extracción de "descriptor facial" (embedding de 512 números)
+   - Normalización del vector
+   - Almacenamiento seguro en base de datos
+
+5. CONFIRMACIÓN:
+   - Mensaje: "Biometría facial registrada exitosamente"
+   - Usuario ahora puede usar reconocimiento facial para login
+
+LÍMITES Y RESTRICCIONES:
+- Solo 1 rostro permitido por usuario
+- Se puede eliminar y volver a registrar
+- No funciona con fotos (debe ser persona real)
+- Requiere condiciones mínimas de calidad
+
+MEDIDAS DE SEGURIDAD:
+✓ Rate limiting: 10 intentos por hora
+✓ Validación de rostro único (anti-spoofing básico)
+✓ Confianza mínima del 70%
+✓ Encriptación del descriptor facial
+
+
+================================================================================
+3. INICIO DE SESIÓN (LOGIN)
+================================================================================
+
+3.1 LOGIN TRADICIONAL (EMAIL Y CONTRASEÑA)
+-------------------------------------------
+URL: /login/
+Método: POST
+
+CAMPOS:
+- Email (obligatorio)
+- Contraseña (obligatorio)
+
+CARACTERÍSTICAS:
+✓ Icono de "ojo" para mostrar/ocultar contraseña
+✓ Validación en tiempo real
+✓ Mensajes de error específicos
+✓ Prevención de doble envío
+✓ Link a recuperación de contraseña
+✓ Link a registro de nuevo usuario
+
+VALIDACIONES:
+- Email debe existir en el sistema
+- Contraseña debe coincidir
+- Usuario debe estar activo (is_active=True)
+
+SISTEMA ANTI-DUPLICACIÓN DE NOTIFICACIONES:
+El sistema previene notificaciones duplicadas verificando:
+- Si existe notificación de login en los últimos 10 segundos
+- Evita crear múltiples notificaciones por recargas accidentales
+
+RESULTADO EXITOSO:
+- Sesión iniciada
+- Notificación in-app: "Bienvenido de vuelta, [nombre]"
+- Redirección según rol:
+  * ADMIN → /admin-dashboard/
+  * OWNER/VET → /dashboard/
+
+
+3.2 LOGIN CON RECONOCIMIENTO FACIAL
+-----------------------------------
+URL: /facial-login/
+Método: Captura de imagen + POST
+
+REQUISITOS PREVIOS:
+✓ Usuario debe haber registrado su biometría facial previamente
+✓ Cámara web funcional
+✓ Buena iluminación
+
+PROCESO:
+
+1. ACCESO A LA INTERFAZ:
+   - Página de login → Botón "Iniciar sesión con reconocimiento facial"
+   - Se abre interfaz de cámara
+
+2. CAPTURA:
+   - Sistema activa cámara web
+   - Usuario se posiciona de frente
+   - Sistema detecta rostro automáticamente
+   - Usuario presiona "Autenticar" o captura automática
+
+3. PROCESAMIENTO:
+   Tecnología: ArcFace ResNet100
+   - Detección de rostro con YuNet
+   - Extracción de descriptor facial (512 números)
+   - Comparación con TODOS los descriptores en BD
+   - Cálculo de similitud coseno con cada usuario
+
+4. VALIDACIONES:
+   ✓ Solo 1 rostro en la imagen
+   ✓ Calidad suficiente (≥70%)
+   ✓ Similitud ≥ 40% con algún usuario registrado
+
+5. DECISIÓN:
+   - Similitud ≥ 0.40 (40%) → LOGIN EXITOSO ✓
+   - Similitud < 0.40 → ACCESO DENEGADO ✗
+
+UMBRAL DE ACEPTACIÓN: 40%
+Razón: Balance entre seguridad y usabilidad
+- Minimiza falsos positivos (otra persona accede)
+- Minimiza falsos negativos (te rechaza siendo tú)
+
+SEGURIDAD:
+✓ Rate limiting: 10 intentos por minuto
+✓ Validación de rostro único
+✓ No funciona con fotos o pantallas
+✓ Registro de intentos fallidos
+
+RESULTADO EXITOSO:
+- Login automático sin contraseña
+- Notificación: "Autenticación facial exitosa"
+- Registro de reconocimiento con timestamp
+- Redirección al dashboard
+
+RESULTADO FALLIDO:
+- Mensaje: "No se reconoció tu rostro. Usa tu contraseña."
+- Registro del intento fallido
+- Opción de volver al login tradicional
+
+
+================================================================================
+4. TIPOS DE USUARIOS Y ROLES
+================================================================================
+
+El sistema maneja 3 roles diferenciados con permisos específicos:
+
+4.1 ADMIN (ADMINISTRADOR)
+-------------------------
+Código interno: 'ADMIN'
+
+PERMISOS COMPLETOS:
+✓ Acceso a dashboard administrativo especializado
+✓ Ver estadísticas globales del sistema
+✓ Gestionar todos los usuarios (crear, editar, eliminar)
+✓ Ver lista completa de usuarios
+✓ Cambiar roles de usuarios
+✓ Acceder a todas las mascotas del sistema
+✓ Ver métricas y reportes avanzados
+✓ Configurar parámetros del sistema
+
+DASHBOARD EXCLUSIVO (URL: /admin-dashboard/):
+Muestra 9 gráficos y 8 estadísticas:
+
+ESTADÍSTICAS:
+1. Total de mascotas registradas
+2. Escaneos totales realizados
+3. Total de usuarios activos
+4. Tasa de éxito de reconocimiento
+5. Registros biométricos activos
+6. Mascotas reportadas como perdidas
+7. Autenticaciones faciales de usuarios
+8. Total de notificaciones generadas
+
+GRÁFICOS:
+1. TOP 10 razas más registradas (gráfico de barras)
+2. Escaneos diarios (últimos 30 días - línea)
+3. Mascotas por etapa de vida (pie chart)
+4. Distribución de condición corporal (doughnut)
+5. Registros mensuales de mascotas (barras)
+6. Actividad por hora del día (línea)
+7. Distribución de roles de usuarios (pie)
+8. Tasa de éxito de reconocimiento (gauge)
+9. Notificaciones por categoría (barras horizontales)
+
+MENÚ EXCLUSIVO:
+- Dashboard Admin
+- Gestión de Usuarios
+
+CARACTERÍSTICAS:
+- Protegido con decorador @user_passes_test(is_admin)
+- Redirige a /dashboard/ si no es admin
+- Acceso completo a logs y auditoría
+
+
+4.2 VET (VETERINARIO)
+---------------------
+Código interno: 'VET'
+
+CAMPOS ADICIONALES:
+- specialization (Especialización - ej: Cirugía, Dermatología)
+- license_number (Número de licencia profesional)
+
+PERMISOS:
+✓ Ver todas las mascotas del sistema
+✓ Acceder a información completa de cualquier mascota
+✓ Ver historiales médicos
+✓ Agregar notas veterinarias
+✓ Acceder a scanner de reconocimiento
+✓ Registrar sus propias mascotas (máximo 2)
+✓ Recibir notificaciones de mascotas perdidas
+
+RESTRICCIONES:
+✗ No puede eliminar mascotas de otros usuarios
+✗ No puede editar información de mascotas ajenas
+✗ No puede gestionar usuarios
+✗ No accede a dashboard administrativo
+
+USO TÍPICO:
+- Consultorios veterinarios
+- Identificación rápida de mascotas
+- Seguimiento de pacientes
+- Respuesta a alertas de mascotas perdidas
+
+
+4.3 OWNER (DUEÑO DE MASCOTA)
+----------------------------
+Código interno: 'OWNER'
+Rol predeterminado al registrarse
+
+PERMISOS:
+✓ Registrar hasta 2 mascotas máximo
+✓ Editar sus propias mascotas
+✓ Eliminar sus propias mascotas
+✓ Registrar biometría de sus mascotas
+✓ Eliminar biometría de sus mascotas
+✓ Reportar mascotas como perdidas
+✓ Generar código QR de sus mascotas
+✓ Usar scanner para identificar mascotas
+✓ Reportar mascotas encontradas
+✓ Generar y descargar carnets
+✓ Ver información pública de otras mascotas (vía QR)
+✓ Recibir notificaciones del sistema
+
+RESTRICCIONES:
+✗ No puede ver mascotas de otros usuarios (solo en scanner)
+✗ No puede editar/eliminar mascotas ajenas
+✗ No puede gestionar usuarios
+✗ No accede a dashboard administrativo
+✗ LÍMITE ESTRICTO: Solo 2 mascotas por usuario
+
+USO TÍPICO:
+- Dueños de mascotas domésticas
+- Registro y seguimiento de sus perros
+- Sistema de localización si se pierden
+- Generación de identificación (QR + carnet)
+
+
+================================================================================
+5. GESTIÓN DE PERFIL DE USUARIO
+================================================================================
+
+5.1 VER PERFIL
+--------------
+URL: /profile/
+Acceso: Solo usuario autenticado
+
+INFORMACIÓN MOSTRADA:
+- Foto de perfil (o avatar predeterminado)
+- Nombre completo
+- Username
+- Email
+- Cédula
+- Dirección
+- Teléfono
+- Rol actual
+- Fecha de registro
+- Estado de biometría facial (registrada o no)
+
+CAMPOS ESPECÍFICOS POR ROL:
+
+Para VET:
+- Especialización
+- Número de licencia
+
+ACCIONES DISPONIBLES:
+✓ Editar perfil
+✓ Cambiar contraseña
+✓ Registrar/Eliminar biometría facial
+✓ Cerrar sesión
+
+
+5.2 EDITAR PERFIL
+-----------------
+URL: /profile/edit/
+Método: POST
+
+CAMPOS EDITABLES:
+- Foto de perfil (imagen)
+- Nombre (first_name)
+- Apellido (last_name)
+- Email (debe seguir siendo único)
+- Cédula (debe seguir siendo única)
+- Dirección
+- Teléfono
+
+PARA VETERINARIOS:
+- Especialización
+- Número de licencia
+
+CAMPOS NO EDITABLES:
+✗ Username (permanente)
+✗ Rol (solo administrador puede cambiar)
+✗ Fecha de registro
+
+VALIDACIONES:
+- Email único en el sistema
+- Cédula única en el sistema
+- Formato de email válido
+- Tamaño de imagen ≤ 5MB
+
+RESULTADO:
+- Mensaje: "Perfil actualizado exitosamente"
+- Notificación in-app de cambio
+- Redirección a vista de perfil
+
+
+5.3 CAMBIAR CONTRASEÑA
+----------------------
+URL: /profile/change-password/
+Método: POST
+
+CAMPOS:
+- Contraseña actual (verificación)
+- Nueva contraseña
+- Confirmar nueva contraseña
+
+VALIDACIONES:
+✓ Contraseña actual debe ser correcta
+✓ Nueva contraseña ≥ 8 caracteres
+✓ Nueva contraseña debe incluir letras y números
+✓ Confirmación debe coincidir con nueva contraseña
+✓ Nueva contraseña debe ser diferente a la actual
+
+SEGURIDAD:
+- Contraseña hasheada con Django's PBKDF2
+- No se almacena en texto plano
+- Sesiones anteriores se invalidan
+- Notificación de cambio enviada
+
+RESULTADO:
+- Mensaje: "Contraseña cambiada exitosamente"
+- Logout automático (debe iniciar sesión con nueva contraseña)
+
+
+5.4 GESTIÓN DE BIOMETRÍA FACIAL DEL USUARIO
+-------------------------------------------
+
+REGISTRAR BIOMETRÍA:
+URL: /facial-biometry/
+- Proceso descrito en sección 2.2
+
+ELIMINAR BIOMETRÍA:
+URL: /facial-biometry/delete/
+Método: POST
+
+CONFIRMACIÓN REQUERIDA:
+- Modal de confirmación antes de eliminar
+- Advertencia: "Deberás volver a registrarla para usar login facial"
+
+RESULTADO:
+- Descriptor facial eliminado de BD
+- Mensaje: "Biometría facial eliminada correctamente"
+- Login facial deshabilitado
+- Usuario debe usar login tradicional
+
+
+================================================================================
+6. RECUPERACIÓN DE CONTRASEÑA
+================================================================================
+
+URL: /password-reset/
+Disponible sin autenticación
+
+PROCESO:
+
+1. SOLICITUD:
+   - Usuario ingresa su email
+   - Sistema verifica que existe
+   - Genera token único temporal
+
+2. ENVÍO DE EMAIL:
+   - Asunto: "Recuperación de contraseña - Sistema Veterinaria"
+   - Contiene enlace con token
+   - Token válido por 1 hora
+
+3. RESTABLECIMIENTO:
+   - Usuario hace clic en enlace
+   - Ingresa nueva contraseña
+   - Confirma nueva contraseña
+
+4. CONFIRMACIÓN:
+   - Contraseña actualizada
+   - Token invalidado
+   - Mensaje: "Contraseña restablecida exitosamente"
+   - Redirección al login
+
+SEGURIDAD:
+✓ Token único de un solo uso
+✓ Expiración en 1 hora
+✓ Verificación de email
+✓ Rate limiting de solicitudes
+
+
+================================================================================
+7. SISTEMA DE NOTIFICACIONES (IN-APP)
+================================================================================
+
+El sistema cuenta con un robusto sistema de notificaciones interno (NO por email, salvo excepciones específicas)
+
+7.1 TIPOS DE NOTIFICACIONES
+---------------------------
+
+POR NIVEL:
+- INFO (azul): Información general
+- SUCCESS (verde): Acciones exitosas
+- WARNING (amarillo): Advertencias
+- ERROR (rojo): Errores o alertas críticas
+
+POR CATEGORÍA:
+- SYSTEM: Notificaciones del sistema
+- MASCOTA: Relacionadas con mascotas
+- USER: Relacionadas con usuarios
+- SECURITY: Seguridad y accesos
+- VETERINARY: Información veterinaria
+- OTHER: Otras categorías
+
+
+7.2 EVENTOS QUE GENERAN NOTIFICACIONES
+--------------------------------------
+
+AUTENTICACIÓN:
+✓ Login exitoso (usuario)
+✓ Login con reconocimiento facial exitoso
+✓ Registro de biometría facial
+✓ Cambio de contraseña
+
+MASCOTAS:
+✓ Mascota registrada exitosamente
+✓ Mascota editada
+✓ Mascota eliminada
+✓ Biometría de mascota registrada
+✓ Biometría de mascota eliminada
+✓ Mascota reportada como perdida
+✓ Mascota encontrada (alguien la escaneó)
+✓ Mascota reconocida en scanner
+
+SISTEMA:
+✓ Bienvenida al sistema (primer login)
+✓ Límite de mascotas alcanzado
+✓ Código QR generado
+✓ Carnet descargado
+
+ALERTAS:
+✓ Mascota perdida en el sistema (notificación a todos)
+✓ Tu mascota fue encontrada (con ubicación)
+
+
+7.3 VISUALIZACIÓN DE NOTIFICACIONES
+-----------------------------------
+
+UBICACIÓN:
+- Icono de campana en navbar (esquina superior derecha)
+- Badge con número de no leídas
+- Panel desplegable al hacer clic
+
+ELEMENTOS DE CADA NOTIFICACIÓN:
+- Icono según tipo
+- Título
+- Mensaje
+- Timestamp (hace X minutos/horas/días)
+- Estado: leída/no leída
+- Link de acción (opcional)
+- Imagen relacionada (opcional - ej: foto de mascota)
+
+INTERACCIONES:
+✓ Clic en notificación → Marca como leída + Redirige a acción
+✓ Botón "Marcar todas como leídas"
+✓ Botón individual "Marcar como leída"
+✓ Botón "Eliminar notificación"
+✓ Scroll infinito si hay muchas
+
+PERSISTENCIA:
+- Se almacenan en base de datos
+- Permanecen hasta que el usuario las elimine
+- No caducan automáticamente
+
+
+7.4 NOTIFICACIONES POR EMAIL (SOLO CASOS ESPECÍFICOS)
+-----------------------------------------------------
+
+El sistema envía emails solo en estos casos:
+
+1. MASCOTA REPORTADA COMO PERDIDA:
+   - Destinatarios: TODOS los usuarios del sistema
+   - Asunto: "🚨 Alerta: [Nombre mascota] ha sido reportada como perdida"
+   - Contenido:
+     * Foto de la mascota
+     * Nombre y descripción
+     * Ubicación donde se perdió
+     * Datos de contacto del propietario
+     * Características especiales
+
+2. MASCOTA ENCONTRADA:
+   - Destinatario: Propietario de la mascota
+   - Asunto: "✅ ¡Alguien encontró a [Nombre mascota]!"
+   - Contenido:
+     * Coordenadas GPS donde fue encontrada
+     * Timestamp del encuentro
+     * Información del dispositivo (IP, navegador)
+     * Link al mapa (si disponible)
+
+3. RECUPERACIÓN DE CONTRASEÑA:
+   - Destinatario: Usuario solicitante
+   - Token de recuperación
+
+
+================================================================================
+8. CERRAR SESIÓN
+================================================================================
+
+URL: /logout/
+Método: GET o POST
+
+PROCESO:
+- Invalida sesión actual
+- Borra tokens de autenticación
+- Limpia cookies
+- Redirección a página de login
+
+MENSAJE:
+"Has cerrado sesión correctamente"
+
+
+================================================================================
+9. MEDIDAS DE SEGURIDAD GENERALES
+================================================================================
+
+9.1 RATE LIMITING (LÍMITES DE INTENTOS)
+---------------------------------------
+
+| Operación                    | Límite       | Período |
+|------------------------------|--------------|---------|
+| Detectar rostro facial       | 30 intentos  | Minuto  |
+| Registrar biometría usuario  | 10 intentos  | Hora    |
+| Login facial                 | 10 intentos  | Minuto  |
+| Eliminar biometría usuario   | 5 intentos   | Hora    |
+| Login tradicional            | 5 intentos   | 15 min  |
+| Solicitar reset de password  | 3 intentos   | Hora    |
+
+Exceder límites resulta en bloqueo temporal
+
+
+9.2 VALIDACIONES DE ARCHIVOS
+----------------------------
+
+IMÁGENES DE PERFIL:
+- Formatos: JPG, JPEG, PNG, WEBP
+- Tamaño máximo: 5 MB
+- Validación de tipo MIME
+- Verificación de contenido real
+
+FOTOS BIOMÉTRICAS:
+- Tamaño mínimo: 50x50 píxeles
+- Confianza mínima: 70%
+- Solo 1 rostro permitido
+
+
+9.3 PROTECCIÓN CSRF
+-------------------
+- Tokens CSRF en todos los formularios
+- Validación en cada POST request
+- Timeout de tokens: 1 hora
+
+
+9.4 PASSWORDS
+-------------
+- Hashing: PBKDF2 con SHA256
+- Salt único por usuario
+- Iteraciones: 216,000
+- No se almacenan en texto plano
+
+================================================================================
+FIN DE PARTE 1 - AUTENTICACIÓN Y USUARIOS
+================================================================================
+
+SIGUIENTE DOCUMENTO: MANUAL_USUARIO_PARTE2_MASCOTAS_Y_FUNCIONALIDADES.txt
+Contendrá:
+- Registro de mascotas
+- Predicción con IA
+- Biometría de mascotas
+- Scanner
+- QR y carnets
+- Mascotas perdidas
+- Dashboard

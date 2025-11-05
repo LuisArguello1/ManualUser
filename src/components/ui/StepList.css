@@ -1,0 +1,72 @@
+.step-list {
+  margin: var(--spacing-lg) 0;
+}
+
+.step-item {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  position: relative;
+  padding-bottom: var(--spacing-lg);
+}
+
+.step-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 50px;
+  width: 2px;
+  height: calc(100% - 30px);
+  background: linear-gradient(to bottom, var(--accent-blue), transparent);
+}
+
+.step-number {
+  position: relative;
+  flex-shrink: 0;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--text-white);
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.step-number i {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 0.8rem;
+  background-color: var(--accent-success);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+}
+
+.step-content {
+  flex: 1;
+  padding-top: 0.5rem;
+}
+
+.step-content h4 {
+  margin-top: 0;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-white);
+}
+
+.step-content p {
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-secondary);
+}
+
+.step-content ul {
+  margin-top: var(--spacing-xs);
+}
